@@ -40,46 +40,49 @@ elif [ "$(uname -s)" = "Linux" ] && [ -e /run/systemd/system ]; then
 fi
 
 INSTALL_MODE=no-daemon
-DARWIN_APFS_VOLUME=0
+CREATE_DARWIN_VOLUME=0
 # Trivially handle the --daemon / --no-daemon options
-if [ "x${1:-}" = "x--no-daemon" ]; then
-    INSTALL_MODE=no-daemon
-elif [ "x${1:-}" = "x--daemon" ]; then
-    INSTALL_MODE=daemon
-elif [ "x${1:-}" = "x--create-volume" ]; then
-    DARWIN_APFS_VOLUME=1
-elif [ "x${1:-}" != "x" ]; then
-    (
-        echo "Nix Installer [--daemon|--no-daemon]"
+while [ $# -gt 0 ]; do
+    case $1 in
+        --daemon)
+            INSTALL_MODE=daemon;;
+        --no-daemon)
+            INSTALL_MODE=no-daemon;;
+        --create-volume)
+            CREATE_DARWIN_VOLUME=1;;
+        *)
+            (
+                echo "Nix Installer [--daemon|--no-daemon]"
 
-        echo "Choose installation method."
-        echo ""
-        echo " --daemon:    Installs and configures a background daemon that manages the store,"
-        echo "              providing multi-user support and better isolation for local builds."
-        echo "              Both for security and reproducibility, this method is recommended if"
-        echo "              supported on your platform."
-        echo "              See https://nixos.org/nix/manual/#sect-multi-user-installation"
-        echo ""
-        echo " --no-daemon: Simple, single-user installation that does not require root and is"
-        echo "              trivial to uninstall."
-        echo "              (default)"
-        echo ""
-    ) >&2
+                echo "Choose installation method."
+                echo ""
+                echo " --daemon:    Installs and configures a background daemon that manages the store,"
+                echo "              providing multi-user support and better isolation for local builds."
+                echo "              Both for security and reproducibility, this method is recommended if"
+                echo "              supported on your platform."
+                echo "              See https://nixos.org/nix/manual/#sect-multi-user-installation"
+                echo ""
+                echo " --no-daemon: Simple, single-user installation that does not require root and is"
+                echo "              trivial to uninstall."
+                echo "              (default)"
+                echo ""
+            ) >&2
 
-    if [ "$(uname -s)" = "Darwin" ]; then
-        (
-            echo " --create-volume: Create an APFS volume for the store and configure it to mount at,"
-            echo "                  /nix and create a mountpoint for it using synthetic.conf."
-            echo "                  This method does not create an encrypted volume."
-            echo "                  See https://nixos.org/nix/manual/#sect-darwin-apfs-volume"
-            echo "                  (required on macOS >=10.15)"
-            echo ""
-        ) >&2
-    fi
-    exit
-fi
+            if [ "$(uname -s)" = "Darwin" ]; then
+                (
+                    echo " --create-volume: Create an APFS volume for the store and create the /nix"
+                    echo "                  mountpoint for it using synthetic.conf."
+                    echo "                  (required on macOS >=10.15)"
+                    echo "                  See https://nixos.org/nix/manual/#sect-darwin-apfs-volume"
+                    echo ""
+                ) >&2
+            fi
+            exit;;
+    esac
+    shift
+done
 
-if [ "$(uname -s)" = "Darwin" ] && [ "$DARWIN_APFS_VOLUME" = 1 ]; then
+if [ "$(uname -s)" = "Darwin" ] && [ "$CREATE_DARWIN_VOLUME" = 1 ]; then
     printf '\e[1;31mCreating volume and mountpoint /nix.\e[0m\n'
     "$self/create-darwin-volume.sh"
 fi
@@ -101,6 +104,15 @@ if ! [ -e $dest ]; then
     echo "directory $dest does not exist; creating it by running '$cmd' using sudo" >&2
     if ! sudo sh -c "$cmd"; then
         echo "$0: please manually run '$cmd' as root to create $dest" >&2
+        if [ "$(uname -s)" = "Darwin" ]; then
+            (
+                echo ""
+                echo "Installing on macOS >=10.15 requires relocating the store to an apfs volume."
+                echo "Use --create-volume or run the preparation steps manually."
+                echo "See https://nixos.org/nix/manual/#sect-darwin-apfs-volume."
+                echo ""
+            ) >&2
+        fi
         exit 1
     fi
 fi

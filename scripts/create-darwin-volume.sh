@@ -87,6 +87,8 @@ main() {
         echo "Creating a Nix Store volume..." >&2
         sudo diskutil apfs addVolume "$disk" APFS 'Nix Store' -mountpoint /nix
         volume="Nix Store"
+    else
+        echo "Using existing '$volume' volume" >&2
     fi
 
     if ! test_fstab; then
