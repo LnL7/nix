@@ -41,14 +41,13 @@ fi
 
 INSTALL_MODE=no-daemon
 CREATE_DARWIN_VOLUME=0
-# Trivially handle the --daemon / --no-daemon options
 while [ $# -gt 0 ]; do
     case $1 in
         --daemon)
             INSTALL_MODE=daemon;;
         --no-daemon)
             INSTALL_MODE=no-daemon;;
-        --create-volume)
+        --darwin-use-unencrypted-nix-store-volume)
             CREATE_DARWIN_VOLUME=1;;
         *)
             (
@@ -68,12 +67,13 @@ while [ $# -gt 0 ]; do
                 echo ""
             ) >&2
 
-            if [ "$(uname -s)" = "Darwin" ]; then
+            # darwin and Catalina+
+            if [ "$(uname -s)" = "Darwin" ] && [ "$macos_major" -gt 14 ]; then
                 (
-                    echo " --create-volume: Create an APFS volume for the store and create the /nix"
-                    echo "                  mountpoint for it using synthetic.conf."
-                    echo "                  (required on macOS >=10.15)"
-                    echo "                  See https://nixos.org/nix/manual/#sect-apfs-volume-installation"
+                    echo " --darwin-use-unencrypted-nix-store-volume: Create an APFS volume for the Nix"
+                    echo "              store and mount it at /nix. This is the recommended way to create"
+                    echo "              /nix with a read-only / on macOS >=10.15."
+                    echo "              See: https://nixos.org/nix/manual/#sect-macos-installation"
                     echo ""
                 ) >&2
             fi
@@ -89,12 +89,12 @@ if [ "$(uname -s)" = "Darwin" ]; then
     fi
 
     info=$(diskutil info -plist / | xpath "/plist/dict/key[text()='Writable']/following-sibling::true[1]" 2> /dev/null)
-    if ! [ -e $dest ] && [ -n "$info" ]; then
+    if ! [ -e $dest ] && [ -n "$info" ] && [ "$macos_major" -gt 14 ]; then
         (
             echo ""
             echo "Installing on macOS >=10.15 requires relocating the store to an apfs volume."
-            echo "Use sh <(curl https://nixos.org/nix/install) --create-volume or run the preparation steps manually."
-            echo "See https://nixos.org/nix/manual/#sect-apfs-volume-installation"
+            echo "Use sh <(curl https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume or run the preparation steps manually."
+            echo "See https://nixos.org/nix/manual/#sect-macos-installation"
             echo ""
         ) >&2
         exit 1
